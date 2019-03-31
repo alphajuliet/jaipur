@@ -9,8 +9,10 @@
     "generics-rep",
     "ordered-collections",
     "prelude",
+    "profunctor-lenses",
     "psci-support",
     "random",
+    "test-unit",
     "tuples",
     "unordered-collections"
   ]
