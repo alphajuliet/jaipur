@@ -1,0 +1,17 @@
+{
+  "name": "jaipur",
+  "set": "psc-0.12.3",
+  "source": "https://github.com/purescript/package-sets.git",
+  "depends": [
+    "arrays",
+    "console",
+    "effect",
+    "generics-rep",
+    "ordered-collections",
+    "prelude",
+    "psci-support",
+    "random",
+    "tuples",
+    "unordered-collections"
+  ]
+}
