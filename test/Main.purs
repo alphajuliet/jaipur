@@ -25,11 +25,17 @@ main = runTest do
   
     test "Score tokens" do
       let s = reset
+      let t0 = (Tuple Spice 0) :: Cards
       let t1 = (Tuple Diamond 2) :: Cards
       let t2 = (Tuple Leather 9) :: Cards
       assert "sumSubset" $ sumSubset [3, 2, 1] 1 == 3 
       assert "sumSubset" $ sumSubset [3, 2, 1] 3 == 6 
       assert "sumSubset" $ sumSubset [3, 2, 1] 4 == 6 
-      assert "scoreTokens" $ scoreTokens s.tokens t1 == 14
-      assert "scoreTokens" $ scoreTokens s.tokens t2 == 15
+      assert "scoreTokens" $ scoreTokens t0 == 0
+      assert "scoreTokens" $ scoreTokens t1 == 14
+      assert "scoreTokens" $ scoreTokens t2 == 15
  
+{-     test "Deal card" do
+      let s = reset
+      let s' = dealToMarket s 1
+      assert "deal to market" $ count s'.deck == 55 -}

@@ -6,10 +6,11 @@ module Jaipur where
 import Prelude
 
 import Data.Array (foldl, index, length, slice)
+import Data.Foldable (sum)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.HashMap (HashMap, empty, fromArray, values)
 import Data.Hashable (class Hashable, hash)
+import Data.Lens (Lens')
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
@@ -26,10 +27,8 @@ randomElement arr = do
 -- sumSubset [7, 7, 5, 5, 5] 3 => 19
 -- sumSubset [7, 7, 5, 5, 5] 6 => 29
 sumSubset :: Array Int -> Int -> Int
-sumSubset arr n = x
-  where 
-    s = (slice 0 n arr)
-    x = foldl add 0 s
+sumSubset arr n = foldl add 0 s
+  where s = (slice 0 n arr)
 
 -- ----------------
 data Resource = Diamond | Gold | Silver | Cloth | Spice | Leather | Camel
@@ -42,25 +41,14 @@ instance hashResource :: Hashable Resource where
 
 -- ----------------
 type Cards = Tuple Resource Int
-type CardSet = HashMap Resource Int
+type CardSet = Array Cards
+
+type CardLens = Lens' CardSet Int
 
 -- ----------------
 -- Total state of the game
 type State = 
   { deck :: CardSet
-  , market :: CardSet
-  , handA :: CardSet
-  , handB :: CardSet
-  , herdA :: CardSet
-  , herdB :: CardSet
-  , pointsA :: Int
-  , pointsB :: Int
-  , tokens :: CardSet
-  }
-
--- Subset of total state that is observable
-type Observation = 
-  { deckSize :: Int
   , market :: CardSet
   , handA :: CardSet
   , handB :: CardSet
@@ -80,7 +68,7 @@ data Action
 
 -- ----------------
 type StepOutput =
-  { observation :: Observation
+  { observation :: State
   , reward :: Number
   , done :: Boolean
   , info :: String 
@@ -90,38 +78,48 @@ type StepOutput =
 -- reset :: State
 reset :: State
 reset = 
-  { deck: fromArray [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8), 
+  { deck: [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8), 
                       (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
-  , market: empty
-  , handA: empty
-  , handB: empty
-  , herdA: empty
-  , herdB: empty
+  , market: []
+  , handA: []
+  , handB: []
+  , herdA: []
+  , herdB: []
   , pointsA: 0
   , pointsB: 0
-  , tokens: fromArray [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7), 
+  , tokens: [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7), 
                         (Tuple Spice 7), (Tuple Leather 9)]
   }
 
 -- observation_space :: State -> Observation
 -- step :: State -> Action -> StepOutput
 
--- Count the number of CardSet in a pile
+-- Count the number of cards in a pile
 count :: CardSet -> Int
-count = values >>> foldl add 0
+count ts = sum $ snd <$> ts
 
--- Deal a card from the deck to the market
-deal :: State -> State
-deal s = s' 
+-- Move one or more cards from a source to a destination
+moveCard :: State -> Cards -> CardLens -> CardLens -> State
+moveCard s0 c src dest = s0
   where
-    s' = s
+    rsrc = fst c
+    n = snd c
 
--- Score the tokens
-scoreTokens :: CardSet -> Cards -> Int
-scoreTokens c t = p
+-- Deal b cards from the deck to the market
+{- dealToMarket :: State -> Int -> State
+dealToMarket s _ = s' 
+  where
+    rsrc = map (map fst) $ randomItem s.deck
+    s' = s
+ -}
+
+-- Score a pile of 0 or more of a single type of token
+-- scoreTokens (Tuple Diamond 2) => 14
+scoreTokens :: Cards -> Int
+scoreTokens tokens = p
   where 
-  n = snd t
-  p = case (fst t) of
+  n = snd tokens
+  p = case (fst tokens) of
     Diamond -> sumSubset [7, 7, 5, 5, 5] n
     Gold -> sumSubset [6, 6, 5, 5, 5] n
     Silver -> sumSubset [5, 5, 5, 5, 5] n
@@ -131,4 +129,4 @@ scoreTokens c t = p
     _ -> 0
 
 
--- The Endn 
+-- The End
