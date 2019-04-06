@@ -7,7 +7,8 @@ import Prelude
 
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur (CardCount, Resource(..), count, reset, scoreAllTokens, scoreTokens, sumSubset)
+import Jaipur (count, reset, scoreAllTokens, scoreTokens, sumSubset)
+import Model (Resource(..), CardCount)
 import Test.Unit (suite, test)
 import Test.Unit.Assert (assert)
 import Test.Unit.Main (runTest)

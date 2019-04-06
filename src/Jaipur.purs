@@ -7,14 +7,12 @@ import Prelude
 
 import Data.Array (foldl, index, length, slice)
 import Data.Foldable (sum)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
-import Data.Hashable (class Hashable, hash)
 import Data.Lens (Lens')
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Random (randomInt)
+import Model
 
 -- ----------------
 -- Return a random element from an array
@@ -31,48 +29,6 @@ sumSubset arr n = foldl add 0 s
   where s = (slice 0 n arr)
 
 -- ----------------
-data Resource = Diamond | Gold | Silver | Cloth | Spice | Leather | Camel
-derive instance genericResource :: Generic Resource _
-derive instance eqResource :: Eq Resource
-instance showResource :: Show Resource where
-  show = genericShow
-instance hashResource :: Hashable Resource where
-  hash = hash <<< show
-
--- ----------------
-type CardCount = Tuple Resource Int
-type CardSet = Array CardCount
-
-type CardLens = Lens' CardSet Int
-
--- ----------------
--- Total state of the game
-type State = 
-  { deck :: CardSet
-  , market :: CardSet
-  , handA :: CardSet
-  , handB :: CardSet
-  , herdA :: CardSet
-  , herdB :: CardSet
-  , pointsA :: Int
-  , pointsB :: Int
-  , tokens :: CardSet
-  }
-
--- ----------------
--- Available actions
-data Action 
-  = Take Resource
-  | Exchange CardSet
-  | Sell CardCount
-
--- ----------------
-type StepOutput =
-  { observation :: State
-  , reward :: Number
-  , done :: Boolean
-  , info :: String 
-  }
 
 -- ----------------
 -- reset :: State
