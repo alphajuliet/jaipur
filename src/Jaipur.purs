@@ -40,8 +40,8 @@ instance hashResource :: Hashable Resource where
   hash = hash <<< show
 
 -- ----------------
-type Cards = Tuple Resource Int
-type CardSet = Array Cards
+type CardCount = Tuple Resource Int
+type CardSet = Array CardCount
 
 type CardLens = Lens' CardSet Int
 
@@ -64,7 +64,7 @@ type State =
 data Action 
   = Take Resource
   | Exchange CardSet
-  | Sell Cards
+  | Sell CardCount
 
 -- ----------------
 type StepOutput =
@@ -99,7 +99,7 @@ count :: CardSet -> Int
 count ts = sum $ snd <$> ts
 
 -- Move one or more cards from a source to a destination
-moveCard :: State -> Cards -> CardLens -> CardLens -> State
+moveCard :: State -> CardCount -> CardLens -> CardLens -> State
 moveCard s0 c src dest = s0
   where
     rsrc = fst c
@@ -115,7 +115,7 @@ dealToMarket s _ = s'
 
 -- Score a pile of 0 or more of a single type of token
 -- scoreTokens (Tuple Diamond 2) => 14
-scoreTokens :: Cards -> Int
+scoreTokens :: CardCount -> Int
 scoreTokens tokens = p
   where 
   n = snd tokens
@@ -123,10 +123,13 @@ scoreTokens tokens = p
     Diamond -> sumSubset [7, 7, 5, 5, 5] n
     Gold -> sumSubset [6, 6, 5, 5, 5] n
     Silver -> sumSubset [5, 5, 5, 5, 5] n
-    Cloth -> sumSubset [5, 3, 3, 2, 2, 1] n
-    Spice -> sumSubset [5, 3, 3, 2, 2, 1] n
+    Cloth -> sumSubset [5, 3, 3, 2, 2, 1, 1] n
+    Spice -> sumSubset [5, 3, 3, 2, 2, 1, 1] n
     Leather -> sumSubset [4, 3, 2, 1, 1, 1, 1, 1, 1] n
     _ -> 0
 
+-- Score all tokens in a pile
+scoreAllTokens :: CardSet -> Int
+scoreAllTokens t = foldl (+) 0 $ scoreTokens <$> t
 
 -- The End
