@@ -7,8 +7,8 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Console (log)
-import Jaipur (reset)
+import Jaipur (initialState)
 
 main :: Effect Unit
 main = do
-  log $ show reset
+  log $ show initialState

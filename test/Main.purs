@@ -7,7 +7,7 @@ import Prelude
 
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur (count, reset, scoreAllTokens, scoreTokens, sumSubset)
+import Jaipur (count, initialState, scoreAllTokens, scoreTokens, sumSubset)
 import Model (Resource(..), CardCount)
 import Test.Unit (suite, test)
 import Test.Unit.Assert (assert)
@@ -21,11 +21,11 @@ main = runTest do
       assert "2+2=4" $ (2 + 2) == 4
 
     test "Number of cards" do
-      let s = reset
+      let s = initialState
       assert "Cards" $ count s.deck == 55
   
     test "Score tokens" do
-      let s = reset
+      let s = initialState
       let t0 = (Tuple Spice 0) :: CardCount
       let t1 = (Tuple Diamond 2) :: CardCount
       let t2 = (Tuple Leather 9) :: CardCount

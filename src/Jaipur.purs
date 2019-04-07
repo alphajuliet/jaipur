@@ -6,13 +6,17 @@ module Jaipur where
 import Prelude
 
 import Data.Array (foldl, index, length, slice)
+import Data.Array.NonEmpty (updateAt)
 import Data.Foldable (sum)
-import Data.Lens (Lens')
-import Data.Maybe (Maybe)
+import Data.HashMap (empty, fromArray, insertWith, lookup, toArrayBy, values)
+import Data.Lens (Lens', lens, view)
+import Data.Lens.At (at)
+import Data.Maybe (Maybe, fromJust)
 import Data.Tuple (Tuple(..), fst, snd)
+import Data.Unfoldable (fromMaybe)
 import Effect (Effect)
 import Effect.Random (randomInt)
-import Model
+import Model (Action(..), CardCount, CardSet, Resource(..), State, StepOutput, PlayerId)
 
 -- ----------------
 -- Return a random element from an array
@@ -29,45 +33,9 @@ sumSubset arr n = foldl add 0 s
   where s = (slice 0 n arr)
 
 -- ----------------
-
--- ----------------
--- reset :: State
-reset :: State
-reset = 
-  { deck: [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8), 
-                      (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
-  , market: []
-  , handA: []
-  , handB: []
-  , herdA: []
-  , herdB: []
-  , pointsA: 0
-  , pointsB: 0
-  , tokens: [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7), 
-                        (Tuple Spice 7), (Tuple Leather 9)]
-  }
-
--- observation_space :: State -> Observation
--- step :: State -> Action -> StepOutput
-
 -- Count the number of cards in a pile
 count :: CardSet -> Int
-count ts = sum $ snd <$> ts
-
--- Move one or more cards from a source to a destination
-moveCard :: State -> CardCount -> CardLens -> CardLens -> State
-moveCard s0 c src dest = s0
-  where
-    rsrc = fst c
-    n = snd c
-
--- Deal b cards from the deck to the market
-{- dealToMarket :: State -> Int -> State
-dealToMarket s _ = s' 
-  where
-    rsrc = map (map fst) $ randomItem s.deck
-    s' = s
- -}
+count ts = sum $ snd <$> (toArrayBy Tuple ts)
 
 -- Score a pile of 0 or more of a single type of token
 -- scoreTokens (Tuple Diamond 2) => 14
@@ -86,6 +54,69 @@ scoreTokens tokens = p
 
 -- Score all tokens in a pile
 scoreAllTokens :: CardSet -> Int
-scoreAllTokens t = foldl (+) 0 $ scoreTokens <$> t
+scoreAllTokens tokens = foldl (+) 0 $ scoreTokens <$> (toArrayBy Tuple tokens)
+
+-- ----------------
+-- reset :: State
+initialState :: State
+initialState = 
+  { deck: fromArray [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8), 
+                      (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
+  , market: empty
+  , hand: []
+  , herd: [ (Tuple Camel 0), (Tuple Camel 0) ]
+  , points: [0, 0]
+  , tokens: fromArray [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7), 
+                        (Tuple Spice 7), (Tuple Leather 9)]
+  }
+
+-- observation_space :: State -> Observation
+step :: State -> Action -> StepOutput 
+step st action = { observation: st', reward: 0.0, isDone: false, info: "" }
+  where 
+  st' = case action of 
+    Take _ _ -> st
+    Exchange _ _ -> st
+    Sell _ _ -> st
+
+-- ----------------
+-- Actions
+
+-- exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
+-- sellCards :: PlayerId -> Resource -> State -> State
+
+-- Add a resource card to a CardSet
+-- addCard :: CardCount -> CardSet -> CardSet
+-- addCard resources deck = 
+
+{- takeCards :: PlayerId -> Resource -> State -> State
+takeCards id rsrc st = st'
+  where
+  n = fromJust $ lookup rsrc $ view _market st
+  market = insertWith (-) rsrc n st.deck
+  hand = updateAt id (insertWith (+) rsrc n) st.hand
+  st' = { market: market, hand: hand }
+ -}  
+-- ----------------
+-- Lenses into the state
+
+_deck :: Lens' State CardSet
+_deck = lens _.deck $ _ { deck = _ }
+
+_market :: Lens' State CardSet
+_market = lens _.market $ _ { market = _ }
+
+_hand :: Lens' State (Array CardSet)
+_hand = lens _.hand $ _ { hand = _ }
+
+_herd :: Lens' State (Array CardCount)
+_herd = lens _.herd $ _ { herd = _ }
+
+{- _rsrc :: Resource -> Lens' State (Maybe Int)
+_rsrc r = at r
+ -}
+-- _hand :: PlayerId -> Lens' State CardSet
+-- _hand id = lens (at 1 <<< _.herd) $ _ { hand = _ }
+
 
 -- The End
