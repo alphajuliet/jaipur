@@ -6,14 +6,12 @@ module Jaipur where
 import Prelude
 
 import Data.Array (foldl, index, length, slice)
-import Data.Array.NonEmpty (updateAt)
 import Data.Foldable (sum)
-import Data.HashMap (empty, fromArray, insertWith, lookup, toArrayBy, values)
 import Data.Lens (Lens', lens, view)
 import Data.Lens.At (at)
+import Data.Map (empty, fromFoldable, toUnfoldable, insertWith, lookup, values) as M
 import Data.Maybe (Maybe, fromJust)
 import Data.Tuple (Tuple(..), fst, snd)
-import Data.Unfoldable (fromMaybe)
 import Effect (Effect)
 import Effect.Random (randomInt)
 import Model (Action(..), CardCount, CardSet, Resource(..), State, StepOutput, PlayerId)
@@ -35,7 +33,7 @@ sumSubset arr n = foldl add 0 s
 -- ----------------
 -- Count the number of cards in a pile
 count :: CardSet -> Int
-count ts = sum $ snd <$> (toArrayBy Tuple ts)
+count ts = sum $ (snd <$> (M.toUnfoldable ts)) :: Array Int
 
 -- Score a pile of 0 or more of a single type of token
 -- scoreTokens (Tuple Diamond 2) => 14
@@ -54,20 +52,23 @@ scoreTokens tokens = p
 
 -- Score all tokens in a pile
 scoreAllTokens :: CardSet -> Int
-scoreAllTokens tokens = foldl (+) 0 $ scoreTokens <$> (toArrayBy Tuple tokens)
+scoreAllTokens allTokens = foldl (+) 0 scores 
+  where scores = (scoreTokens <$> (M.toUnfoldable allTokens)) :: Array Int
 
 -- ----------------
 -- reset :: State
 initialState :: State
 initialState = 
-  { deck: fromArray [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8), 
-                      (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
-  , market: empty
+  { deck: M.fromFoldable [ 
+      (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8), 
+      (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
+  , market: M.empty
   , hand: []
   , herd: [ (Tuple Camel 0), (Tuple Camel 0) ]
   , points: [0, 0]
-  , tokens: fromArray [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7), 
-                        (Tuple Spice 7), (Tuple Leather 9)]
+  , tokens: M.fromFoldable [ 
+      (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7), 
+      (Tuple Spice 7), (Tuple Leather 9)]
   }
 
 -- observation_space :: State -> Observation

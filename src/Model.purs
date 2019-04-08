@@ -7,7 +7,7 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.HashMap (HashMap, lookup, insert, delete) as M
+import Data.Map (Map, lookup, insert, delete) as M
 import Data.Hashable (class Hashable, hash)
 import Data.Lens (Lens', lens)
 import Data.Lens.At (class At, at)
@@ -18,6 +18,7 @@ import Data.Tuple (Tuple)
 data Resource = Diamond | Gold | Silver | Cloth | Spice | Leather | Camel
 derive instance genericResource :: Generic Resource _
 derive instance eqResource :: Eq Resource
+derive instance ordResource :: Ord Resource
 instance showResource :: Show Resource where
   show = genericShow
 instance hashResource :: Hashable Resource where
@@ -31,7 +32,7 @@ instance hashResource :: Hashable Resource where
  -}
 -- ----------------
 type CardCount = Tuple Resource Int
-type CardSet = M.HashMap Resource Int
+type CardSet = M.Map Resource Int
 
 -- ----------------
 -- Total state of the game
