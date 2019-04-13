@@ -126,15 +126,18 @@ takeCamels id st = st'
     st' = addResource (_herd <<< at id) n s0
 
 -- Sell all of a given card
-{- sellCards :: PlayerId -> Resource -> State -> State
+sellCards :: PlayerId -> Resource -> State -> State
 sellCards id rsrc st = st'
   where
-    n = fromMaybe 0 $ view (_market <<< at Camel) st
-    s0 = addResource (_hand <<< at id) 
-    st' = s0
- -}
+    n = fromMaybe 0 $ join $ map (view (at rsrc)) $ view (_hand <<< at id) st
+    r = (M.singleton rsrc 0) :: CardSet
+    s1 = setJust (_hand <<< at id) r st
+    s2 = addResource (_tokens <<< at rsrc) (-n) s1
+    t = scoreTokens (Tuple rsrc n)
+    st' = over (_points <<< at id) (map \pts -> pts + t) s2
+
 -- ----------------
--- Lenses into the state
+-- Lenses into the model state
 
 _deck :: Lens' State CardSet
 _deck = lens _.deck $ _ { deck = _ }
@@ -148,4 +151,9 @@ _hand = lens _.hand $ _ { hand = _ }
 _herd :: Lens' State (M.Map PlayerId Int)
 _herd = lens _.herd $ _ { herd = _ }
 
+_tokens :: Lens' State CardSet
+_tokens = lens _.tokens $ _ { tokens = _ }
+
+_points :: Lens' State (M.Map PlayerId Int)
+_points = lens _.points $ _ { points = _ }
 -- The End

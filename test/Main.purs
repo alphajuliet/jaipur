@@ -10,7 +10,7 @@ import Data.Lens.At (at)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur (_hand, _herd, count, dealCard, initialState, scoreAllTokens, scoreTokens, sumSubset, takeCamels, takeCard)
+import Jaipur
 import Model (CardCount, PlayerId(..), Resource(..))
 import Test.Unit (suite, test)
 import Test.Unit.Assert (assert)
@@ -48,12 +48,20 @@ main = runTest do
 
     test "Take cards" do
       let s = initialState
-      let s0 = dealCard Diamond $ dealCard Diamond s
+      let s0 = (dealCard Diamond >>> dealCard Diamond) s
       let s1 = takeCard PlayerA Diamond s0
       assert "takeCard" $ (count <$> view (_hand <<< at PlayerA) s1) == Just 1
 
     test "Take camels" do
       let s = initialState
-      let s0 = dealCard Camel $ dealCard Camel s
+      let s0 = (dealCard Camel >>> dealCard Camel) s
       let s1 = takeCamels PlayerA s0
-      assert "takeCamels" $ view (_herd <<< at PlayerA) s1 == Just 2
+      assert "2 camels" $ view (_herd <<< at PlayerA) s1 == Just 2
+
+    test "Sell cards" do
+      let s = initialState
+      let s1 = (takeCard PlayerA Gold >>> dealCard Gold) s
+      let s2 = sellCards PlayerA Gold s1
+      assert "hand cards not zero" $ (count <$> view (_hand <<< at PlayerA) s2) == Just 0
+      assert "tokens reduced" $ view (_tokens <<< at Gold) s2 == Just 4
+      assert "gained points" $ view (_points <<< at PlayerA) s2 == Just 6
