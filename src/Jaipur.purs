@@ -7,14 +7,14 @@ import Prelude
 
 import Data.Array (foldl, index, length, slice)
 import Data.Foldable (sum)
-import Data.Lens (Lens', lens, view)
+import Data.Lens (Lens', lens, over, setJust, view)
 import Data.Lens.At (at)
-import Data.Map (empty, fromFoldable, toUnfoldable, insertWith, lookup, values) as M
-import Data.Maybe (Maybe, fromJust)
+import Data.Map (Map, empty, fromFoldable, toUnfoldable, singleton) as M
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Random (randomInt)
-import Model (Action(..), CardCount, CardSet, Resource(..), State, StepOutput, PlayerId)
+import Model (Action(..), CardCount, CardSet, PlayerId(..), Resource(..), State, StepOutput)
 
 -- ----------------
 -- Return a random element from an array
@@ -59,16 +59,22 @@ scoreAllTokens allTokens = foldl (+) 0 scores
 -- reset :: State
 initialState :: State
 initialState = 
-  { deck: M.fromFoldable [ 
-      (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8), 
-      (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
+  { deck: M.fromFoldable 
+      [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8)
+      , (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
   , market: M.empty
-  , hand: []
-  , herd: [ (Tuple Camel 0), (Tuple Camel 0) ]
-  , points: [0, 0]
-  , tokens: M.fromFoldable [ 
-      (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7), 
-      (Tuple Spice 7), (Tuple Leather 9)]
+  , hand: M.fromFoldable 
+      [ (Tuple PlayerA M.empty)
+      , (Tuple PlayerB M.empty)]
+  , herd: M.fromFoldable 
+      [ (Tuple PlayerA 0)
+      , (Tuple PlayerB 0)]
+  , points: M.fromFoldable 
+      [ (Tuple PlayerA 0)
+      , (Tuple PlayerB 0)]
+  , tokens: M.fromFoldable 
+      [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7)
+      , (Tuple Spice 7), (Tuple Leather 9)]
   }
 
 -- observation_space :: State -> Observation
@@ -86,18 +92,31 @@ step st action = { observation: st', reward: 0.0, isDone: false, info: "" }
 -- exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
 -- sellCards :: PlayerId -> Resource -> State -> State
 
--- Add a resource card to a CardSet
--- addCard :: CardCount -> CardSet -> CardSet
--- addCard resources deck = 
-
-{- takeCards :: PlayerId -> Resource -> State -> State
-takeCards id rsrc st = st'
+-- Add or remove a card from a state
+addResource :: Lens' State (Maybe Int) -> Int -> State -> State
+addResource _lens n st = cards
   where
-  n = fromJust $ lookup rsrc $ view _market st
-  market = insertWith (-) rsrc n st.deck
-  hand = updateAt id (insertWith (+) rsrc n) st.hand
-  st' = { market: market, hand: hand }
- -}  
+    x = view _lens st
+    cards = case x of
+      Just _ -> over _lens (map \m -> m + n) st
+      Nothing -> setJust _lens n st
+
+-- Deal a card from the Deck to the Market
+dealCard :: Resource -> State -> State
+dealCard rsrc st = st'
+  where
+    s = addResource (_deck <<< at rsrc) (-1) st
+    st' = addResource (_market <<< at rsrc) 1 s
+
+-- Take a card of a given type from the market 
+takeCard :: PlayerId -> Resource -> State -> State
+takeCard id rsrc st = st'
+  where 
+    -- n = fromMaybe 0 $ view (_market <<< at rsrc) st
+    s0  = addResource (_market <<< at rsrc) (-1) st 
+    r = (M.singleton rsrc 1) :: CardSet
+    st' = setJust (_hand <<< at id) r s0
+
 -- ----------------
 -- Lenses into the state
 
@@ -107,17 +126,10 @@ _deck = lens _.deck $ _ { deck = _ }
 _market :: Lens' State CardSet
 _market = lens _.market $ _ { market = _ }
 
-_hand :: Lens' State (Array CardSet)
+_hand :: Lens' State (M.Map PlayerId CardSet)
 _hand = lens _.hand $ _ { hand = _ }
 
-_herd :: Lens' State (Array CardCount)
+_herd :: Lens' State (M.Map PlayerId Int)
 _herd = lens _.herd $ _ { herd = _ }
-
-{- _rsrc :: Resource -> Lens' State (Maybe Int)
-_rsrc r = at r
- -}
--- _hand :: PlayerId -> Lens' State CardSet
--- _hand id = lens (at 1 <<< _.herd) $ _ { hand = _ }
-
 
 -- The End

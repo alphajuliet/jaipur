@@ -5,13 +5,10 @@ module Model where
 
 import Prelude
 
+import Data.Map as M
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Map (Map, lookup, insert, delete) as M
 import Data.Hashable (class Hashable, hash)
-import Data.Lens (Lens', lens)
-import Data.Lens.At (class At, at)
-import Data.Maybe (maybe)
 import Data.Tuple (Tuple)
 
 -- ----------------
@@ -24,12 +21,15 @@ instance showResource :: Show Resource where
 instance hashResource :: Hashable Resource where
   hash = hash <<< show
 
-{- instance atHashMap :: Ord k => At (M.HashMap k v) k v where
-  at k =
-    lens (M.lookup k) \m ->
-      maybe (M.delete k m) \v -> 
-        M.insert k v m
- -}
+data PlayerId = PlayerA | PlayerB
+derive instance genericPlayerId :: Generic PlayerId _
+derive instance eqPlayerId :: Eq PlayerId
+derive instance ordPlayerId :: Ord PlayerId
+instance showPlayerId :: Show PlayerId where
+  show = genericShow
+instance hashPlayerId :: Hashable PlayerId where
+  hash = hash <<< show
+
 -- ----------------
 type CardCount = Tuple Resource Int
 type CardSet = M.Map Resource Int
@@ -39,14 +39,11 @@ type CardSet = M.Map Resource Int
 type State = 
   { deck    :: CardSet
   , market  :: CardSet
-  , hand    :: Array CardSet
-  , herd    :: Array CardCount -- must all be camels
-  , points  :: Array Int
+  , hand    :: M.Map PlayerId CardSet
+  , herd    :: M.Map PlayerId Int
+  , points  :: M.Map PlayerId Int
   , tokens  :: CardSet
   }
-
--- Player ID, in this case 0 or 1
-type PlayerId = Int
 
 -- ----------------
 -- Available player actions

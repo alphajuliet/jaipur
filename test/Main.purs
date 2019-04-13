@@ -7,7 +7,7 @@ import Prelude
 
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur (count, initialState, scoreAllTokens, scoreTokens, sumSubset)
+import Jaipur (count, dealCard, initialState, scoreAllTokens, scoreTokens, sumSubset)
 import Model (Resource(..), CardCount)
 import Test.Unit (suite, test)
 import Test.Unit.Assert (assert)
@@ -37,7 +37,8 @@ main = runTest do
       assert "scoreTokens" $ scoreTokens t2 == 15
       assert "total tokens" $ scoreAllTokens s.tokens == 130
  
-{-     test "Deal card" do
-      let s = reset
-      let s' = dealToMarket s 1
-      assert "deal to market" $ count s'.deck == 55 -}
+    test "Deal cards" do
+      let s = initialState
+      let s' = dealCard Diamond s 
+      assert "dealCard" $ count s'.deck == 54
+      assert "dealCard" $ count s'.market == 1
