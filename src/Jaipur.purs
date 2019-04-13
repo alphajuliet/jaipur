@@ -10,7 +10,7 @@ import Data.Foldable (sum)
 import Data.Lens (Lens', lens, over, setJust, view)
 import Data.Lens.At (at)
 import Data.Map (Map, empty, fromFoldable, toUnfoldable, singleton) as M
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Random (randomInt)
@@ -117,6 +117,22 @@ takeCard id rsrc st = st'
     r = (M.singleton rsrc 1) :: CardSet
     st' = setJust (_hand <<< at id) r s0
 
+-- Take all the camels in the market
+takeCamels :: PlayerId -> State -> State
+takeCamels id st = st'
+  where
+    n = fromMaybe 0 $ view (_market <<< at Camel) st
+    s0 = addResource (_market <<< at Camel) (-n) st
+    st' = addResource (_herd <<< at id) n s0
+
+-- Sell all of a given card
+{- sellCards :: PlayerId -> Resource -> State -> State
+sellCards id rsrc st = st'
+  where
+    n = fromMaybe 0 $ view (_market <<< at Camel) st
+    s0 = addResource (_hand <<< at id) 
+    st' = s0
+ -}
 -- ----------------
 -- Lenses into the state
 

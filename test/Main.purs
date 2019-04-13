@@ -5,10 +5,13 @@ module Test.Main where
 
 import Prelude
 
+import Data.Lens (view)
+import Data.Lens.At (at)
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur (count, dealCard, initialState, scoreAllTokens, scoreTokens, sumSubset)
-import Model (Resource(..), CardCount)
+import Jaipur (_hand, _herd, count, dealCard, initialState, scoreAllTokens, scoreTokens, sumSubset, takeCamels, takeCard)
+import Model (CardCount, PlayerId(..), Resource(..))
 import Test.Unit (suite, test)
 import Test.Unit.Assert (assert)
 import Test.Unit.Main (runTest)
@@ -42,3 +45,15 @@ main = runTest do
       let s' = dealCard Diamond s 
       assert "dealCard" $ count s'.deck == 54
       assert "dealCard" $ count s'.market == 1
+
+    test "Take cards" do
+      let s = initialState
+      let s0 = dealCard Diamond $ dealCard Diamond s
+      let s1 = takeCard PlayerA Diamond s0
+      assert "takeCard" $ (count <$> view (_hand <<< at PlayerA) s1) == Just 1
+
+    test "Take camels" do
+      let s = initialState
+      let s0 = dealCard Camel $ dealCard Camel s
+      let s1 = takeCamels PlayerA s0
+      assert "takeCamels" $ view (_herd <<< at PlayerA) s1 == Just 2
