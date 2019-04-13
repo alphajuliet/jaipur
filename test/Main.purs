@@ -50,7 +50,9 @@ main = runTest do
       let s = initialState
       let s0 = (dealCard Diamond >>> dealCard Diamond) s
       let s1 = takeCard PlayerA Diamond s0
-      assert "takeCard" $ (count <$> view (_hand <<< at PlayerA) s1) == Just 1
+      let s2 = takeCard PlayerA Diamond s1
+      assert "take first card" $ (count <$> view (_hand <<< at PlayerA) s1) == Just 1
+      assert "take second card" $ (count <$> view (_hand <<< at PlayerA) s2) == Just 2
 
     test "Take camels" do
       let s = initialState
