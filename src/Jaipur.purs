@@ -7,7 +7,7 @@ import Prelude
 
 import Data.Array (foldl, index, length, slice)
 import Data.Foldable (sum)
-import Data.Lens (Lens', lens, over, preview, setJust, traversed, view)
+import Data.Lens (Lens', lens, over, preview, set, setJust, traversed, view)
 import Data.Lens.At (at)
 import Data.Map (Map, empty, fromFoldable, toUnfoldable, singleton) as M
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -63,8 +63,8 @@ initialState =
       [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8)
       , (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
   , market: M.empty
-  , hand: M.empty
-  , herd: M.empty
+  , hand: M.fromFoldable [ (Tuple PlayerA M.empty), (Tuple PlayerB M.empty)]
+  , herd: M.fromFoldable [ (Tuple PlayerA 0), (Tuple PlayerB 0)]
   , points: M.empty
   , tokens: M.fromFoldable 
       [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7)
@@ -83,52 +83,58 @@ step st action = { observation: st', reward: 0.0, isDone: false, info: "" }
 -- ----------------
 -- Actions
 
--- exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
--- sellCards :: PlayerId -> Resource -> State -> State
+type CardLens = Lens' State (Maybe Int)
 
--- Add or remove a card from a state
-addToTarget :: Lens' State (Maybe Int) -> Int -> State -> State
-addToTarget _lens n st = cards
+-- Utility function to add or subtract a resource card
+addToTarget :: CardLens -> Int -> State -> State
+addToTarget _lens n st = st'
   where
-    x = view _lens st
-    cards = case x of
-      Just _ -> over _lens (map \m -> m + n) st
+    current = view _lens st
+    st' = case current of
+      Just _ -> over _lens (map (_+n)) st
       Nothing -> setJust _lens n st
+
+-- Move n cards from src to dest
+moveCards :: CardLens -> CardLens -> Int -> State -> State
+moveCards _src _dest n st = st'
+  where
+    st' = (addToTarget _src (-n) <<< addToTarget _dest n) st 
 
 -- Deal a card from the Deck to the Market
 dealCard :: Resource -> State -> State
-dealCard rsrc st = st'
-  where
-    s = addToTarget (_deck <<< at rsrc) (-1) st
-    st' = addToTarget (_market <<< at rsrc) 1 s
+dealCard rsrc = moveCards (_deck <<< at rsrc) (_market <<< at rsrc) 1
 
 -- Take a card of a given type from the market 
 takeCard :: PlayerId -> Resource -> State -> State
 takeCard id rsrc st = st'
   where 
-    s0  = addToTarget (_market <<< at rsrc) (-1) st 
-    n = fromMaybe 0 $ join $ preview (_hand <<< at id <<< traversed <<< at rsrc) st
-    r = (M.singleton rsrc (n+1)) :: CardSet
-    st' = setJust (_hand <<< at id) r s0
+    s0 = addToTarget (_market <<< at rsrc) (-1) st 
+    _lens = _hand <<< at id <<< traversed <<< at rsrc
+    current = join $ preview _lens s0
+    st' = case current of 
+      Just _ -> over (_hand <<< at id <<< traversed <<< at rsrc) (map (_+1)) s0
+      Nothing -> setJust (_hand <<< at id <<< traversed <<< at rsrc) 1 s0
 
 -- Take all the camels in the market
 takeCamels :: PlayerId -> State -> State
 takeCamels id st = st'
   where
     n = fromMaybe 0 $ view (_market <<< at Camel) st
-    s0 = addToTarget (_market <<< at Camel) (-n) st
-    st' = addToTarget (_herd <<< at id) n s0
+    st' = moveCards (_market <<< at Camel) (_herd <<< at id) n st
 
 -- Sell all of a given card
 sellCards :: PlayerId -> Resource -> State -> State
 sellCards id rsrc st = st'
   where
-    n = fromMaybe 0 $ join $ preview (_hand <<< at id <<< traversed <<< at rsrc) st
+    n = countHandResource id rsrc st
     r = (M.singleton rsrc 0) :: CardSet
-    s1 = setJust (_hand <<< at id) r st
+    s1 = set (_hand <<< at id <<< traversed <<< at rsrc) Nothing st
     s2 = addToTarget (_tokens <<< at rsrc) (-n) s1
     t = scoreTokens (Tuple rsrc n)
     st' = addToTarget (_points <<< at id) t s2
+
+-- exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
+-- exchangeCards id inSet outSet st = ...
 
 -- ----------------
 -- Lenses into the model state
@@ -150,4 +156,13 @@ _tokens = lens _.tokens $ _ { tokens = _ }
 
 _points :: Lens' State (M.Map PlayerId Int)
 _points = lens _.points $ _ { points = _ }
+
+-- _hand_id_rsrc :: PlayerId -> Resource -> CardLens
+-- _hand_id_rsrc id rsrc = _hand <<< at id <<< traversed <<< at rsrc 
+
+countHandResource :: PlayerId -> Resource -> State -> Int
+countHandResource id rsrc st = 
+  fromMaybe 0 $ join $ 
+    preview (_hand <<< at id <<< traversed <<< at rsrc) st
+
 -- The End

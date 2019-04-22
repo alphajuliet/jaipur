@@ -43,12 +43,12 @@ main = runTest do
     test "Deal cards" do
       let s = initialState
       let s' = dealCard Diamond s 
-      assert "dealCard" $ count s'.deck == 54
-      assert "dealCard" $ count s'.market == 1
+      assert "deck reduced by 1" $ count s'.deck == 54
+      assert "market increased by 1" $ count s'.market == 1
 
     test "Take cards" do
       let s = initialState
-      let s0 = (dealCard Diamond >>> dealCard Diamond) s
+      let s0 = (dealCard Diamond <<< dealCard Diamond) s
       let s1 = takeCard PlayerA Diamond s0
       let s2 = takeCard PlayerA Diamond s1
       assert "take first card" $ (count <$> view (_hand <<< at PlayerA) s1) == Just 1
@@ -56,14 +56,20 @@ main = runTest do
 
     test "Take camels" do
       let s = initialState
-      let s0 = (dealCard Camel >>> dealCard Camel) s
+      let s0 = (dealCard Camel <<< dealCard Camel) s
       let s1 = takeCamels PlayerA s0
-      assert "2 camels" $ view (_herd <<< at PlayerA) s1 == Just 2
+      assert "take all the camels" $ view (_herd <<< at PlayerA) s1 == Just 2
 
     test "Sell cards" do
       let s = initialState
-      let s1 = (takeCard PlayerA Gold >>> dealCard Gold) s
+      let s1 = (dealCard Gold <<< dealCard Diamond <<< takeCard PlayerA Gold) s
       let s2 = sellCards PlayerA Gold s1
       assert "hand cards not zero" $ (count <$> view (_hand <<< at PlayerA) s2) == Just 0
       assert "tokens reduced" $ view (_tokens <<< at Gold) s2 == Just 4
       assert "gained points" $ view (_points <<< at PlayerA) s2 == Just 6
+
+    test "Exchange cards" do
+      let s = initialState
+      assert "ha!" $ 2 + 2 == 4
+
+-- The End
