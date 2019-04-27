@@ -3,15 +3,15 @@
 
 module Test.Main where
 
-import Prelude
+import Prelude (Unit, discard, ($), (+), (<$>), (<<<), (==))
 
 import Data.Lens (view)
 import Data.Lens.At (at)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur
-import Model (CardCount, PlayerId(..), Resource(..))
+import Jaipur (count, dealCard, scoreAllTokens, scoreTokens, sellCards, sumSubset, takeCamels, takeCard)
+import Model (CardCount, PlayerId(..), Resource(..), initialState, _hand, _herd, _points, _tokens)
 import Test.Unit (suite, test)
 import Test.Unit.Assert (assert)
 import Test.Unit.Main (runTest)

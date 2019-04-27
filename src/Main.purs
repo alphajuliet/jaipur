@@ -7,7 +7,7 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Console (log)
-import Jaipur (initialState)
+import Model (initialState)
 
 main :: Effect Unit
 main = do
