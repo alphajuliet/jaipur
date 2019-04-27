@@ -7,15 +7,14 @@ import Prelude
 
 import Data.Array (foldl, index, length, slice)
 import Data.Foldable (sum)
-import Data.Lens (Lens', over, preview, set, setJust, traversed, view)
+import Data.Lens (Lens', over, preview, setJust, traversed, view)
 import Data.Lens.At (at)
-import Data.Map (toUnfoldable, singleton) as M
+import Data.Map (toUnfoldable) as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Random (randomInt)
-import Model (Action(..), CardCount, CardSet, PlayerId, Resource(..), State, StepOutput, 
-              _market, _deck, _hand, _herd, _tokens, _points)
+import Model (Action(..), CardCount, CardSet, PlayerId, Resource(..), State, StepOutput, _market, _deck, _hand, _herd, _tokens, _points)
 
 -- ----------------
 -- Return a random element from an array
@@ -57,6 +56,14 @@ scoreTokens tokens = p
     Leather -> sumSubset [4, 3, 2, 1, 1, 1, 1, 1, 1] n
     _ -> 0
 
+-- Minimum sale of each resource
+minimumSell :: Resource -> Int
+minimumSell rsrc = case rsrc of 
+  Diamond -> 2
+  Gold -> 2
+  Silver -> 2
+  _ -> 1
+
 -- Score all tokens in a pile
 scoreAllTokens :: CardSet -> Int
 scoreAllTokens allTokens = foldl (+) 0 scores 
@@ -76,6 +83,11 @@ step st action = { observation: st', reward: 0.0, isDone: false, info: "" }
 -- Actions
 
 type CardLens = Lens' State (Maybe Int)
+
+-- Utility function to count held resources
+countHandResource :: PlayerId -> Resource -> State -> Int
+countHandResource id rsrc st = 
+  fromMaybe 0 $ join $ preview (_hand <<< at id <<< traversed <<< at rsrc) st
 
 -- Utility function to add or subtract a resource card
 addToTarget :: CardLens -> Int -> State -> State
@@ -118,11 +130,14 @@ takeCamels id st = st'
 sellCards :: PlayerId -> Resource -> State -> State
 sellCards id rsrc st = st'
   where
+    -- Check that player is holding the required minimum number of cards
     n = countHandResource id rsrc st
-    r = (M.singleton rsrc 0) :: CardSet
-    s1 = set (_hand <<< at id <<< traversed <<< at rsrc) Nothing st
-    s2 = addToTarget (_tokens <<< at rsrc) (-n) s1
-    t = scoreTokens (Tuple rsrc n)
+    n' | n < minimumSell rsrc = 0 
+       | otherwise = n
+
+    s1 = over (_hand <<< at id <<< traversed <<< at rsrc) (map (_-n')) st
+    s2 = addToTarget (_tokens <<< at rsrc) (-n') s1
+    t = scoreTokens (Tuple rsrc n')
     st' = addToTarget (_points <<< at id) t s2
 
 -- exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
@@ -130,10 +145,5 @@ sellCards id rsrc st = st'
 
 -- _hand_id_rsrc :: PlayerId -> Resource -> CardLens
 -- _hand_id_rsrc id rsrc = _hand <<< at id <<< traversed <<< at rsrc 
-
-countHandResource :: PlayerId -> Resource -> State -> Int
-countHandResource id rsrc st = 
-  fromMaybe 0 $ join $ 
-    preview (_hand <<< at id <<< traversed <<< at rsrc) st
 
 -- The End

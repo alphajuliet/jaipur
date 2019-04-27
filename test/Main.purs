@@ -3,15 +3,14 @@
 
 module Test.Main where
 
-import Prelude (Unit, discard, ($), (+), (<$>), (<<<), (==))
-
 import Data.Lens (view)
 import Data.Lens.At (at)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur (count, dealCard, scoreAllTokens, scoreTokens, sellCards, sumSubset, takeCamels, takeCard)
-import Model (CardCount, PlayerId(..), Resource(..), initialState, _hand, _herd, _points, _tokens)
+import Jaipur (count, countHandResource, dealCard, minimumSell, scoreAllTokens, scoreTokens, sellCards, sumSubset, takeCamels, takeCard)
+import Model (CardCount, PlayerId(..), Resource(..), _hand, _herd, _points, _tokens, initialState)
+import Prelude (Unit, discard, ($), (+), (<$>), (<<<), (==))
 import Test.Unit (suite, test)
 import Test.Unit.Assert (assert)
 import Test.Unit.Main (runTest)
@@ -26,6 +25,10 @@ main = runTest do
     test "Number of cards" do
       let s = initialState
       assert "Cards" $ count s.deck == 55
+
+    test "Minimum sell" do
+      assert "Diamond" $ minimumSell Diamond == 2
+      assert "Leather" $ minimumSell Leather == 1
   
     test "Score tokens" do
       let s = initialState
@@ -62,11 +65,20 @@ main = runTest do
 
     test "Sell cards" do
       let s = initialState
-      let s1 = (dealCard Gold <<< dealCard Diamond <<< takeCard PlayerA Gold) s
-      let s2 = sellCards PlayerA Gold s1
-      assert "hand cards not zero" $ (count <$> view (_hand <<< at PlayerA) s2) == Just 0
-      assert "tokens reduced" $ view (_tokens <<< at Gold) s2 == Just 4
-      assert "gained points" $ view (_points <<< at PlayerA) s2 == Just 6
+      let s1 = (dealCard Leather 
+            <<< dealCard Diamond 
+            <<< takeCard PlayerA Leather 
+            <<< takeCard PlayerA Diamond) s
+      let s2 = sellCards PlayerA Leather s1
+      let s3 = sellCards PlayerA Diamond s2
+      
+      assert "sell Leather" $ countHandResource PlayerA Leather s2 == 0
+      assert "Leather tokens reduced" $ view (_tokens <<< at Leather) s2 == Just 8
+      assert "gained points for Leather" $ view (_points <<< at PlayerA) s2 == Just 4
+      assert "no change to Diamond" $ countHandResource PlayerA Diamond s2 == 1
+
+      assert "can't sell Diamond" $ countHandResource PlayerA Diamond s3 == 1
+      assert "no points for Diamond" $ view (_points <<< at PlayerA) s3 == Just 4
 
     test "Exchange cards" do
       let s = initialState
