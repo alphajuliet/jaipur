@@ -1,16 +1,21 @@
 -- Model.purs
 -- AndrewJ 2019-04-06
+-- [i:258115]
 
 module Model where
 
 import Prelude
 
+import Data.Array (null)
+import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hashable (class Hashable, hash)
-import Data.Lens (Lens', lens)
+import Data.Lens (Lens', lens, view)
+import Data.Lens.At (at)
 import Data.Map as M
-import Data.Tuple (Tuple(..))
+import Data.Maybe (Maybe, fromMaybe)
+import Data.Tuple (Tuple(..), fst, snd)
 
 -- ----------------
 data Resource = Diamond | Gold | Silver | Cloth | Spice | Leather | Camel
@@ -50,7 +55,7 @@ type State =
 -- Available player actions
 data Action 
   = Take PlayerId Resource
-  | Exchange PlayerId CardSet
+  | Exchange PlayerId CardSet CardSet
   | Sell PlayerId Resource
 
 -- ----------------
@@ -62,7 +67,10 @@ type StepOutput =
   }
 
 -- ----------------
--- Lenses into the model state
+-- Lenses into the state, to encapsulate the model
+-- The convention is to prefix a lens with an underscore
+
+type CardLens = Lens' State (Maybe Int)
 
 _deck :: Lens' State CardSet
 _deck = lens _.deck $ _ { deck = _ }
@@ -97,5 +105,25 @@ initialState =
       , (Tuple Spice 7), (Tuple Leather 9)]
   }
 
+-- --------
+-- Prettier print the current state
+
+showMap :: forall k v. Show k => Show v => M.Map k v -> String
+showMap c = str
+  where
+    tupleArray = (M.toUnfoldable c) :: Array (Tuple k v)
+    strArray = map (\t -> (show $ fst t) <> ": " <> (show $ snd t)) $ tupleArray
+    str | null strArray = "(empty)"
+        | otherwise = intercalate " | " strArray
+
+showState :: State -> String
+showState st = intercalate ", " 
+  [ "Deck: " <> (showMap st.deck)
+  , "Market: " <> (showMap st.market)
+  , "Hand A: " <> (showMap $ fromMaybe M.empty $ view (at PlayerA) st.hand)
+  , "Hand B: " <> (showMap $ fromMaybe M.empty $ view (at PlayerB) st.hand)
+  , "Herds: " <> showMap st.herd
+  , "Tokens: " <> (showMap st.tokens) 
+  ]
 
 -- The End
