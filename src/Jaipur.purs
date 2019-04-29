@@ -1,5 +1,6 @@
 -- src/Jaipur.purs
 -- AndrewJ 2019-03-31
+-- [i:258115]
 
 module Jaipur where
   
@@ -7,14 +8,14 @@ import Prelude
 
 import Data.Array (foldl, index, length, slice)
 import Data.Foldable (sum)
-import Data.Lens (Lens', over, preview, setJust, traversed, view)
+import Data.Lens (Lens', Traversal', over, preview, setJust, traversed, view)
 import Data.Lens.At (at)
 import Data.Map (toUnfoldable) as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Random (randomInt)
-import Model (Action(..), CardCount, CardSet, PlayerId, Resource(..), State, StepOutput, _market, _deck, _hand, _herd, _tokens, _points)
+import Model (Action(..), CardCount, CardSet, PlayerId, Resource(..), State, StepOutput, CardLens, CardTraversal, _deck, _hand, _herd, _market, _points, _tokens)
 
 -- ----------------
 -- Return a random element from an array
@@ -30,12 +31,6 @@ sumSubset :: Array Int -> Int -> Int
 sumSubset arr n = foldl add 0 s
   where s = (slice 0 n arr)
 
-
-{- newtype TMap = TMap M.Map
-instance showTMap :: Show TMap where
-  show m = map (\t -> show (fst t) <> ": " <> show (snd t)) 
-               (M.toUnfoldable $ TMap m)
- -}
 -- ----------------
 -- Count the number of cards in a pile
 count :: CardSet -> Int
@@ -59,6 +54,7 @@ scoreTokens tokens = p
 -- Minimum sale of each resource
 minimumSell :: Resource -> Int
 minimumSell rsrc = case rsrc of 
+  Camel -> 99
   Diamond -> 2
   Gold -> 2
   Silver -> 2
@@ -76,57 +72,81 @@ step st action = { observation: st', reward: 0.0, isDone: false, info: "" }
   where 
   st' = case action of 
     Take _ _ -> st
-    Exchange _ _ -> st
+    Exchange _ _ _ -> st
     Sell _ _ -> st
 
 -- ----------------
--- Actions
+-- Utility functions 
 
-type CardLens = Lens' State (Maybe Int)
+_handResource :: PlayerId -> Resource -> Traversal' State (Maybe Int)
+_handResource id rsrc = _hand <<< at id <<< traversed <<< at rsrc
 
--- Utility function to count held resources
+-- Count held resources
 countHandResource :: PlayerId -> Resource -> State -> Int
 countHandResource id rsrc st = 
-  fromMaybe 0 $ join $ preview (_hand <<< at id <<< traversed <<< at rsrc) st
+  fromMaybe 0 $ join $ preview (_handResource id rsrc) st
 
--- Utility function to add or subtract a resource card
-addToTarget :: CardLens -> Int -> State -> State
-addToTarget _lens n st = st'
+countResource :: Resource -> CardSet -> Int
+countResource rsrc c = fromMaybe 0 $ view (at rsrc) c
+
+-- Add or take n resources from a pile of cards
+-- addTo :: CardLens -> Int -> State -> State
+addTo :: CardTraversal -> Int -> State -> State
+addTo _ 0 st = st
+addTo _lens n st = st'
   where
-    current = view _lens st
+    current = join $ preview _lens st
     st' = case current of
       Just _ -> over _lens (map (_+n)) st
       Nothing -> setJust _lens n st
 
+takeFrom :: CardLens -> Int -> State -> State 
+takeFrom _ 0 st = st
+takeFrom _lens n st = over _lens (map (_-n)) st
+
+
 -- Move n cards from src to dest
+-- Check first that cards are available to take
 moveCards :: CardLens -> CardLens -> Int -> State -> State
+moveCards _ _ 0 st = st
 moveCards _src _dest n st = st'
   where
-    st' = (addToTarget _src (-n) <<< addToTarget _dest n) st 
+    current = fromMaybe 0 $ view _src st
+    n' | n <= current = n
+       | otherwise = 0
+    st' = (takeFrom _src n' <<< addTo _dest n') st 
 
--- Deal a card from the Deck to the Market
+-- ----------------
+-- Actions
+
+-- Deal a card from the deck to the market
 dealCard :: Resource -> State -> State
 dealCard rsrc = moveCards (_deck <<< at rsrc) (_market <<< at rsrc) 1
 
--- Take a card of a given type from the market 
+-- A player takes a resource from the market 
 takeCard :: PlayerId -> Resource -> State -> State
 takeCard id rsrc st = st'
   where 
-    s0 = addToTarget (_market <<< at rsrc) (-1) st 
-    _lens = _hand <<< at id <<< traversed <<< at rsrc
-    current = join $ preview _lens s0
-    st' = case current of 
-      Just _ -> over (_hand <<< at id <<< traversed <<< at rsrc) (map (_+1)) s0
-      Nothing -> setJust (_hand <<< at id <<< traversed <<< at rsrc) 1 s0
+    _src = (_market <<< at rsrc) :: Lens' State (Maybe Int)
+    _dest = _handResource id rsrc
 
--- Take all the camels in the market
+    current = fromMaybe 0 $ join $ preview _src st
+    n | current > 0 = 1
+      | otherwise = 0
+
+    st' = (takeFrom _src 1 <<< addTo _dest 1) st 
+    
+-- A player takes all the camels in the market
 takeCamels :: PlayerId -> State -> State
 takeCamels id st = st'
   where
-    n = fromMaybe 0 $ view (_market <<< at Camel) st
-    st' = moveCards (_market <<< at Camel) (_herd <<< at id) n st
+    _src = (_market <<< at Camel) :: Lens' State (Maybe Int)
+    _dest = (_herd <<< at id) :: Lens' State (Maybe Int)
 
--- Sell all of a given card
+    n = fromMaybe 0 $ view _src st
+    st' = moveCards _src _dest n st
+
+-- A player sells all of a given resource
 sellCards :: PlayerId -> Resource -> State -> State
 sellCards id rsrc st = st'
   where
@@ -135,15 +155,23 @@ sellCards id rsrc st = st'
     n' | n < minimumSell rsrc = 0 
        | otherwise = n
 
-    s1 = over (_hand <<< at id <<< traversed <<< at rsrc) (map (_-n')) st
-    s2 = addToTarget (_tokens <<< at rsrc) (-n') s1
+    s1 = over (_handResource id rsrc) (map (_-n')) st
+    s2 = addTo (_tokens <<< at rsrc) (-n') s1
     t = scoreTokens (Tuple rsrc n')
-    st' = addToTarget (_points <<< at id) t s2
+    st' = addTo (_points <<< at id) t s2
 
--- exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
--- exchangeCards id inSet outSet st = ...
-
--- _hand_id_rsrc :: PlayerId -> Resource -> CardLens
--- _hand_id_rsrc id rsrc = _hand <<< at id <<< traversed <<< at rsrc 
+-- Exchange hand cards with market cards
+exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
+exchangeCards id inSet outSet st = st'
+  where 
+{-     in_arr = (M.toUnfoldable inSet) :: Array CardCount
+    st1 = map in_f in_arr
+    in_f tpl = moveCards (_handResource id (fst tpl)) 
+                         (_market <<< at (fst tpl))
+                         (-(snd tpl)) 
+                         st
+    out_arr = (M.toUnfoldable outSet) :: Array CardCount
+ -}
+    st' = st
 
 -- The End

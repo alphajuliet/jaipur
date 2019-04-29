@@ -11,7 +11,7 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hashable (class Hashable, hash)
-import Data.Lens (Lens', lens, view)
+import Data.Lens (Lens', Traversal', lens, view)
 import Data.Lens.At (at)
 import Data.Map as M
 import Data.Maybe (Maybe, fromMaybe)
@@ -71,6 +71,7 @@ type StepOutput =
 -- The convention is to prefix a lens with an underscore
 
 type CardLens = Lens' State (Maybe Int)
+type CardTraversal = Traversal' State (Maybe Int)
 
 _deck :: Lens' State CardSet
 _deck = lens _.deck $ _ { deck = _ }
@@ -94,15 +95,15 @@ _points = lens _.points $ _ { points = _ }
 initialState :: State
 initialState = 
   { deck: M.fromFoldable 
-      [ (Tuple Diamond 6), (Tuple Gold 6), (Tuple Silver 6), (Tuple Cloth 8)
-      , (Tuple Spice 8), (Tuple Leather 10), (Tuple Camel 11) ]
+      [ Tuple Diamond 6, Tuple Gold 6, Tuple Silver 6, Tuple Cloth 8
+      , Tuple Spice 8, Tuple Leather 10, Tuple Camel 11 ]
   , market: M.empty
-  , hand: M.fromFoldable [ (Tuple PlayerA M.empty), (Tuple PlayerB M.empty) ]
-  , herd: M.fromFoldable [ (Tuple PlayerA 0), (Tuple PlayerB 0) ]
+  , hand: M.fromFoldable [ Tuple PlayerA M.empty, Tuple PlayerB M.empty ]
+  , herd: M.fromFoldable [ Tuple PlayerA 0, Tuple PlayerB 0 ]
   , points: M.empty
   , tokens: M.fromFoldable 
-      [ (Tuple Diamond 5), (Tuple Gold 5), (Tuple Silver 5), (Tuple Cloth 7)
-      , (Tuple Spice 7), (Tuple Leather 9)]
+      [ Tuple Diamond 5, Tuple Gold 5, Tuple Silver 5, Tuple Cloth 7
+      , Tuple Spice 7, Tuple Leather 9]
   }
 
 -- --------
@@ -117,13 +118,13 @@ showMap c = str
         | otherwise = intercalate " | " strArray
 
 showState :: State -> String
-showState st = intercalate ", " 
-  [ "Deck: " <> (showMap st.deck)
-  , "Market: " <> (showMap st.market)
-  , "Hand A: " <> (showMap $ fromMaybe M.empty $ view (at PlayerA) st.hand)
-  , "Hand B: " <> (showMap $ fromMaybe M.empty $ view (at PlayerB) st.hand)
-  , "Herds: " <> showMap st.herd
-  , "Tokens: " <> (showMap st.tokens) 
+showState st = intercalate "    " 
+  [ "Deck> "   <> (showMap st.deck)
+  , "Market> " <> (showMap st.market)
+  , "Hand A> " <> (showMap $ fromMaybe M.empty $ view (at PlayerA) st.hand)
+  , "Hand B> " <> (showMap $ fromMaybe M.empty $ view (at PlayerB) st.hand)
+  , "Herds> "  <> showMap st.herd
+  , "Tokens> " <> (showMap st.tokens) 
   ]
 
 -- The End
