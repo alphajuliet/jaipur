@@ -1,14 +1,16 @@
 -- test/Main.purs
 -- AndrewJ 2019-03-31
+-- [i:258115]
 
 module Test.Main where
 
-import Data.Lens (view)
+import Data.Lens (setJust, traversed, view)
 import Data.Lens.At (at)
 import Data.Maybe (Maybe(..))
+import Data.Map (fromFoldable) as M
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Jaipur (count, countHandResource, dealCard, minimumSell, scoreAllTokens, scoreTokens, sellCards, sumSubset, takeCamels, takeCard)
+import Jaipur (count, countHandResource, dealCard, exchangeCards, minimumSell, scoreAllTokens, scoreTokens, sellCards, sumSubset, takeCamels, takeCard)
 import Model (CardCount, PlayerId(..), Resource(..), _hand, _herd, _points, _tokens, initialState)
 import Prelude (Unit, discard, ($), (+), (<$>), (<<<), (==))
 import Test.Unit (suite, test)
@@ -82,6 +84,11 @@ main = runTest do
 
     test "Exchange cards" do
       let s = initialState
-      assert "ha!" $ 2 + 2 == 4
+      let s1 = setJust (_hand <<< at PlayerA <<< traversed <<< at Leather) 2 s
+      let s2 = (dealCard Diamond <<< dealCard Diamond) s1
+      let s3 = exchangeCards PlayerA (M.fromFoldable [(Tuple Leather 2)]) (M.fromFoldable [(Tuple Diamond 2)]) s2
+
+      assert "hold 2 Diamond" $ countHandResource PlayerA Diamond s3 == 2
+      assert "hold 0 Leather" $ countHandResource PlayerA Leather s3 == 0
 
 -- The End

@@ -10,7 +10,7 @@ import Data.Array (foldl, index, length, slice)
 import Data.Foldable (sum)
 import Data.Lens (Lens', Traversal', over, preview, setJust, traversed, view)
 import Data.Lens.At (at)
-import Data.Map (toUnfoldable) as M
+import Data.Map (toUnfoldable, unionWith) as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
@@ -111,7 +111,7 @@ moveCards :: CardLens -> CardLens -> Int -> State -> State
 moveCards _ _ 0 st = st
 moveCards _src _dest n st = st'
   where
-    current = fromMaybe 0 $ view _src st
+    current = fromMaybe 0 $ join $ preview _src st
     n' | n <= current = n
        | otherwise = 0
     st' = (takeFrom _src n' <<< addTo _dest n') st 
@@ -161,17 +161,16 @@ sellCards id rsrc st = st'
     st' = addTo (_points <<< at id) t s2
 
 -- Exchange hand cards with market cards
+-- Does not yet check for legal exchanges
 exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
 exchangeCards id inSet outSet st = st'
   where 
-{-     in_arr = (M.toUnfoldable inSet) :: Array CardCount
-    st1 = map in_f in_arr
-    in_f tpl = moveCards (_handResource id (fst tpl)) 
-                         (_market <<< at (fst tpl))
-                         (-(snd tpl)) 
-                         st
-    out_arr = (M.toUnfoldable outSet) :: Array CardCount
- -}
-    st' = st
+    f = (-) >>> negate
+    st' = (over _market (M.unionWith (+) inSet) 
+      <<< over _market (M.unionWith f outSet)
+      <<< over (_hand <<< at id) (map (M.unionWith (+) outSet))
+      <<< over (_hand <<< at id) (map (M.unionWith f inSet))) st
+
+    -- st' = st
 
 -- The End
