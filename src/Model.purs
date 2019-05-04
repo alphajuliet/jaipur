@@ -11,7 +11,7 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Hashable (class Hashable, hash)
-import Data.Lens (Lens', Traversal', lens, view)
+import Data.Lens (Lens', Traversal', lens, traversed, view)
 import Data.Lens.At (at)
 import Data.Map as M
 import Data.Maybe (Maybe, fromMaybe)
@@ -90,6 +90,9 @@ _tokens = lens _.tokens $ _ { tokens = _ }
 
 _points :: Lens' State (M.Map PlayerId Int)
 _points = lens _.points $ _ { points = _ }
+
+_handResource :: PlayerId -> Resource -> Traversal' State (Maybe Int)
+_handResource id rsrc = _hand <<< at id <<< traversed <<< at rsrc
 
 -- Initial state of the game
 initialState :: State

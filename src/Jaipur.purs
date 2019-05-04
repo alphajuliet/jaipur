@@ -8,14 +8,14 @@ import Prelude
 
 import Data.Array (foldl, index, length, slice)
 import Data.Foldable (sum)
-import Data.Lens (Lens', Traversal', over, preview, setJust, traversed, view)
+import Data.Lens (Lens', over, preview, setJust, view)
 import Data.Lens.At (at)
-import Data.Map (toUnfoldable, unionWith) as M
+import Data.Map (empty, toUnfoldable, unionWith) as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Random (randomInt)
-import Model (Action(..), CardCount, CardSet, PlayerId, Resource(..), State, StepOutput, CardLens, CardTraversal, _deck, _hand, _herd, _market, _points, _tokens)
+import Model (Action(..), CardCount, CardSet, PlayerId, Resource(..), State, StepOutput, CardLens, CardTraversal, _deck, _hand, _herd, _market, _points, _tokens, _handResource)
 
 -- ----------------
 -- Return a random element from an array
@@ -78,9 +78,6 @@ step st action = { observation: st', reward: 0.0, isDone: false, info: "" }
 -- ----------------
 -- Utility functions 
 
-_handResource :: PlayerId -> Resource -> Traversal' State (Maybe Int)
-_handResource id rsrc = _hand <<< at id <<< traversed <<< at rsrc
-
 -- Count held resources
 countHandResource :: PlayerId -> Resource -> State -> Int
 countHandResource id rsrc st = 
@@ -104,7 +101,6 @@ takeFrom :: CardLens -> Int -> State -> State
 takeFrom _ 0 st = st
 takeFrom _lens n st = over _lens (map (_-n)) st
 
-
 -- Move n cards from src to dest
 -- Check first that cards are available to take
 moveCards :: CardLens -> CardLens -> Int -> State -> State
@@ -119,7 +115,7 @@ moveCards _src _dest n st = st'
 -- ----------------
 -- Actions
 
--- Deal a card from the deck to the market
+-- Deal a resource from the deck to the market
 dealCard :: Resource -> State -> State
 dealCard rsrc = moveCards (_deck <<< at rsrc) (_market <<< at rsrc) 1
 
@@ -130,8 +126,10 @@ takeCard id rsrc st = st'
     _src = (_market <<< at rsrc) :: Lens' State (Maybe Int)
     _dest = _handResource id rsrc
 
-    current = fromMaybe 0 $ join $ preview _src st
-    n | current > 0 = 1
+    nMarket = fromMaybe 0 $ join $ preview _src st
+    nHand = count $ fromMaybe M.empty $ view (_hand <<< at id) st
+
+    n | (nMarket > 0) && (nHand < 7) = 1
       | otherwise = 0
 
     st' = (takeFrom _src 1 <<< addTo _dest 1) st 
@@ -155,22 +153,26 @@ sellCards id rsrc st = st'
     n' | n < minimumSell rsrc = 0 
        | otherwise = n
 
-    s1 = over (_handResource id rsrc) (map (_-n')) st
-    s2 = addTo (_tokens <<< at rsrc) (-n') s1
     t = scoreTokens (Tuple rsrc n')
-    st' = addTo (_points <<< at id) t s2
+    st' = (over (_handResource id rsrc) (map (_-n'))
+      <<< addTo (_tokens <<< at rsrc) (-n')
+      <<< addTo (_points <<< at id) t) st
 
 -- Exchange hand cards with market cards
--- Does not yet check for legal exchanges
 exchangeCards :: PlayerId -> CardSet -> CardSet -> State -> State
 exchangeCards id inSet outSet st = st'
   where 
-    f = (-) >>> negate
-    st' = (over _market (M.unionWith (+) inSet) 
-      <<< over _market (M.unionWith f outSet)
-      <<< over (_hand <<< at id) (map (M.unionWith (+) outSet))
-      <<< over (_hand <<< at id) (map (M.unionWith f inSet))) st
+    -- Functions to add/subtract maps with numeric values
+    addSet = M.unionWith (+)
+    subSet = M.unionWith $ flip (-)
 
-    -- st' = st
+    -- Ensure card numbers match
+    n = (count inSet) - (count outSet)
+    -- Do the card swaps
+    st' | n == 0 = (over _market (addSet inSet) 
+                    <<< over _market (subSet outSet)
+                    <<< over (_hand <<< at id) (map $ addSet outSet)
+                    <<< over (_hand <<< at id) (map $ subSet inSet)) st
+        | otherwise = st
 
 -- The End

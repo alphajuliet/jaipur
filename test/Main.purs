@@ -6,8 +6,8 @@ module Test.Main where
 
 import Data.Lens (setJust, traversed, view)
 import Data.Lens.At (at)
-import Data.Maybe (Maybe(..))
 import Data.Map (fromFoldable) as M
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Jaipur (count, countHandResource, dealCard, exchangeCards, minimumSell, scoreAllTokens, scoreTokens, sellCards, sumSubset, takeCamels, takeCard)
@@ -86,9 +86,10 @@ main = runTest do
       let s = initialState
       let s1 = setJust (_hand <<< at PlayerA <<< traversed <<< at Leather) 2 s
       let s2 = (dealCard Diamond <<< dealCard Diamond) s1
-      let s3 = exchangeCards PlayerA (M.fromFoldable [(Tuple Leather 2)]) (M.fromFoldable [(Tuple Diamond 2)]) s2
-
+      let s3 = exchangeCards PlayerA (M.fromFoldable [Tuple Leather 2]) (M.fromFoldable [Tuple Diamond 2]) s2
       assert "hold 2 Diamond" $ countHandResource PlayerA Diamond s3 == 2
       assert "hold 0 Leather" $ countHandResource PlayerA Leather s3 == 0
+      let s4 = exchangeCards PlayerA (M.fromFoldable [Tuple Leather 3]) (M.fromFoldable [Tuple Diamond 1]) s2
+      assert "unchanged state for unequal card numbers" $ s4 == s2
 
 -- The End
