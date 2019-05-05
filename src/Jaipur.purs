@@ -6,7 +6,7 @@ module Jaipur where
   
 import Prelude
 
-import Data.Array (foldl, index, length, slice)
+import Data.Array (concat, foldl, index, length, replicate, slice)
 import Data.Foldable (sum)
 import Data.Lens (Lens', over, preview, setJust, view)
 import Data.Lens.At (at)
@@ -30,6 +30,11 @@ randomElement arr = do
 sumSubset :: Array Int -> Int -> Int
 sumSubset arr n = foldl add 0 s
   where s = (slice 0 n arr)
+
+-- Fully enumerate a card set
+enumerate :: CardSet -> Array Resource
+enumerate cards = concat $ map f $ M.toUnfoldable cards
+  where f = \tpl -> replicate (snd tpl) (fst tpl)
 
 -- ----------------
 -- Count the number of cards in a pile
@@ -115,9 +120,20 @@ moveCards _src _dest n st = st'
 -- ----------------
 -- Actions
 
--- Deal a resource from the deck to the market
+-- Deal a specific resource from the deck to the market (deterministic function used for unit testing)
 dealCard :: Resource -> State -> State
 dealCard rsrc = moveCards (_deck <<< at rsrc) (_market <<< at rsrc) 1
+
+-- Deal a random card from the deck to the market
+dealRandom :: State -> Effect State
+dealRandom st = st'
+  where 
+    st' = do -- ∀ a. EFfect a
+      card <- randomElement $ enumerate $ view _deck st -- :: Effect (Maybe Resource)
+      let s0 = case card of
+                Just rsrc -> dealCard rsrc st
+                Nothing -> st
+      pure s0
 
 -- A player takes a resource from the market 
 takeCard :: PlayerId -> Resource -> State -> State
