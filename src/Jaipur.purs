@@ -10,14 +10,20 @@ import Data.Array (concat, foldl, index, length, replicate, slice)
 import Data.Foldable (sum)
 import Data.Lens (Lens', over, preview, setJust, view)
 import Data.Lens.At (at)
-import Data.Map (empty, toUnfoldable, unionWith) as M
+import Data.Map (Map, empty, toUnfoldable, unionWith) as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Random (randomInt)
-import Model (Action(..), CardCount, CardSet, PlayerId, Resource(..), State, StepOutput, CardLens, CardTraversal, _deck, _hand, _herd, _market, _points, _tokens, _handResource)
+import Model (Action(..), CardCount, CardSet, CardTraversal, PlayerId(..), Resource(..), State, StepOutput, _deck, _hand, _handResource, _herd, _market, _points, _tokens, initialState)
 
 -- ----------------
+
+-- Repeatedly compose a monadic function but only return the final value
+iterateK :: ∀ m a. Monad m => Int -> (a -> m a) -> a -> m a
+iterateK 0 f a = pure a
+iterateK n f a = f =<< (iterateK (n-1) f a)
+
 -- Return a random element from an array
 randomElement :: ∀ a. Array a -> Effect (Maybe a)
 randomElement arr = do
@@ -31,9 +37,9 @@ sumSubset :: Array Int -> Int -> Int
 sumSubset arr n = foldl add 0 s
   where s = (slice 0 n arr)
 
--- Fully enumerate a card set
-enumerate :: CardSet -> Array Resource
-enumerate cards = concat $ map f $ M.toUnfoldable cards
+-- Fully enumerate a map with integer values
+enumerate :: ∀ a. M.Map a Int -> Array a
+enumerate m = concat $ map f $ M.toUnfoldable m
   where f = \tpl -> replicate (snd tpl) (fst tpl)
 
 -- ----------------
@@ -102,13 +108,13 @@ addTo _lens n st = st'
       Just _ -> over _lens (map (_+n)) st
       Nothing -> setJust _lens n st
 
-takeFrom :: CardLens -> Int -> State -> State 
+takeFrom :: CardTraversal -> Int -> State -> State 
 takeFrom _ 0 st = st
 takeFrom _lens n st = over _lens (map (_-n)) st
 
 -- Move n cards from src to dest
 -- Check first that cards are available to take
-moveCards :: CardLens -> CardLens -> Int -> State -> State
+moveCards :: CardTraversal -> CardTraversal -> Int -> State -> State
 moveCards _ _ 0 st = st
 moveCards _src _dest n st = st'
   where
@@ -125,16 +131,36 @@ dealCard :: Resource -> State -> State
 dealCard rsrc = moveCards (_deck <<< at rsrc) (_market <<< at rsrc) 1
 
 -- Deal a random card from the deck to the market
-dealRandom :: State -> Effect State
-dealRandom st = st'
+dealMarket :: State -> Effect State
+dealMarket st = st'
   where 
-    st' = do -- ∀ a. EFfect a
+    st' = do
       card <- randomElement $ enumerate $ view _deck st -- :: Effect (Maybe Resource)
       let s0 = case card of
-                Just rsrc -> dealCard rsrc st
-                Nothing -> st
+                 Just rsrc -> dealCard rsrc st
+                 Nothing -> st
       pure s0
 
+dealHand :: PlayerId -> State -> Effect State 
+dealHand id st = st'
+  where
+    st' = do
+      card <- randomElement $ enumerate $ view _deck st
+      let s0 = case card of 
+                 Just rsrc -> moveCards (_deck <<< at rsrc) (_handResource id rsrc) 1 st
+                 Nothing -> st
+      pure s0
+
+-- Set up the game with random cards
+initGame :: Effect State
+initGame = do
+  let s0 = initialState
+  s1 <- iterateK 4 (dealHand PlayerA) s0
+  s2 <- iterateK 4 (dealHand PlayerB) s1
+  s3 <- iterateK 5 dealMarket s2
+  pure s3
+
+-- ----------------
 -- A player takes a resource from the market 
 takeCard :: PlayerId -> Resource -> State -> State
 takeCard id rsrc st = st'

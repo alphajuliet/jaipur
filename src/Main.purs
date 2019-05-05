@@ -7,8 +7,10 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Console (log)
-import Model (initialState)
+import Jaipur (initGame)
+import Model (showState)
 
 main :: Effect Unit
 main = do
-  log $ show initialState
+  s0 <- initGame
+  log $ showState s0
