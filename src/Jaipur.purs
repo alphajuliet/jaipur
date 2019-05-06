@@ -6,11 +6,12 @@ module Jaipur where
   
 import Prelude
 
-import Data.Array (concat, foldl, index, length, replicate, slice)
+import Data.Array (concat, foldl, group', index, length, replicate, slice)
+import Data.Array.NonEmpty (head, length) as N
 import Data.Foldable (sum)
 import Data.Lens (Lens', over, preview, setJust, view)
 import Data.Lens.At (at)
-import Data.Map (Map, empty, toUnfoldable, unionWith) as M
+import Data.Map (Map, empty, fromFoldable, toUnfoldable, unionWith) as M
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
@@ -41,6 +42,14 @@ sumSubset arr n = foldl add 0 s
 enumerate :: ∀ a. M.Map a Int -> Array a
 enumerate m = concat $ map f $ M.toUnfoldable m
   where f = \tpl -> replicate (snd tpl) (fst tpl)
+
+-- Opposite of enumerate
+-- e.g. createCardSet [Leather, Leather, Diamond, Leather] 
+--   => (fromFoldable [(Tuple Diamond 1),(Tuple Leather 3)])
+createCardSet :: Array Resource -> CardSet
+createCardSet rsrcs = M.fromFoldable $ map tuples $ group' rsrcs
+  where
+    tuples e = Tuple (N.head e) (N.length e)
 
 -- ----------------
 -- Count the number of cards in a pile
